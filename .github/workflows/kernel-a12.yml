@@ -15,19 +15,6 @@ on:
         required: true
         type: boolean
         default: true
-      kernelsu_variant:
-        required: true
-        type: string
-        default: NEXT
-      kernelsu_branch:
-        required: true
-        type: string
-        default: Dev
-      kernelsu_branch_other:
-        required: false
-        type: string
-        default: ""
-
 
 jobs:
   build-kernels-a12:
@@ -46,6 +33,3 @@ jobs:
       sub_level: ${{ matrix.sub_level }}
       os_patch_level: ${{ matrix.os_patch_level }}
       revision: ${{ matrix.revision }}
-      kernelsu_variant: ${{ inputs.kernelsu_variant || 'NEXT'}}
-      kernelsu_branch: ${{ inputs.kernelsu_branch || 'Dev' }}
-      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other || '' }}

@@ -18,15 +18,6 @@ on:
       os_patch_level:
         required: true
         type: string
-      kernelsu_variant:
-        required: true
-        type: string
-      kernelsu_branch:
-        required: true
-        type: string
-      kernelsu_branch_other:
-        required: false
-        type: string
       revision:
         required: false
         type: string
@@ -89,16 +80,9 @@ jobs:
           echo "UNPACK_BOOTIMG=$GITHUB_WORKSPACE/mkbootimg/unpack_bootimg.py" >> $GITHUB_ENV
 
       - name: Set boot sign key
-        env:
-          BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
         run: |
-          if [ ! -z "$BOOT_SIGN_KEY" ]; then
-            echo "$BOOT_SIGN_KEY" > ./kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
-            echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
-          else
-            echo "BOOT_SIGN_KEY is not set. Using AOSP sign key..."
-            echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
-          fi
+        echo "Using AOSP sign key as BOOT_SIGN_KEY ..."
+        echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
       - name: Install Repo
         run: |
@@ -140,55 +124,14 @@ jobs:
           fi
           $REPO --version
           $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
-
-      - name: Determine the branch for KernelSU
-        run: |
-          case "${{ inputs.kernelsu_branch }}" in
-            "Stable")
-              echo "BRANCH=-" >> $GITHUB_ENV
-              ;;
-            "Dev")
-              if [[ "${{ inputs.kernelsu_variant }}" =~ ^(KSU|MKSU)$ ]]; then
-                echo "BRANCH=-s main" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "NEXT" ]]; then
-                echo "BRANCH=-s next" >> $GITHUB_ENV
-              elif [[ "${{ inputs.kernelsu_variant }}" == "WILD" ]]; then
-                echo "BRANCH=-s wild" >> $GITHUB_ENV
-              fi
-              ;;
-            "Other")
-              if [[ -n "${{ inputs.kernelsu_branch_other }}" ]]; then
-                echo "BRANCH=-s ${{ inputs.kernelsu_branch_other }}" >> $GITHUB_ENV
-              else
-                echo "Error: Custom branch not provided for 'Other'" >&2
-                exit 1
-              fi
-              ;;
-          esac
       
       - name: Add KernelSU
         run: |
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG"
-      
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Adding Wild KSU..."
-              curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-            "KSU")
-              echo "Adding KernelSU Official..."
-              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-            "NEXT")
-              echo "Adding KernelSU Next..."
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-            "MKSU")
-              echo "Adding KernelSU MKSU..."
-              curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash ${{ env.BRANCH }}
-              ;;
-          esac
+
+          echo "Adding KernelSU Next..."
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
       - name: Apply SUSFS Patches for KernelSU Variants
         run: |
@@ -204,42 +147,11 @@ jobs:
           cd ..
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./Wild_KSU
-              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
-              cp ../../kernel_patches/wild/fix_core_hook.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
-              cp ../../kernel_patches/wild/fix_selinux.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_selinux.c.patch
-              cp ../../kernel_patches/wild/fix_ksud.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_ksud.c.patch
-              cp ../../kernel_patches/wild/fix_sucompat.c.patch ./
-              patch -p1 --forward --fuzz=3 < fix_sucompat.c.patch
-              sed -i '/bool ksu_devpts_hook = false;/d' ./kernel/sucompat.c
-              ;;
-            "KSU")
-              echo "Applying SUSFS patches for Official KernelSU..."
-              cd ./KernelSU
-              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-              patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch
-              ;;
-            "NEXT")
-              echo "Applying SUSFS patches for KernelSU Next..."
-              cd ./KernelSU-Next
-              cp ../../kernel_patches/next/0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch ./
-              patch -p1 --forward --fuzz=3 < 0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch || true
-              ;;
-            "MKSU")
-              echo "Applying SUSFS patches for MKSU..."
-              cd ./KernelSU
-              cp ../../kernel_patches/next/0001_susfs_157_for_ksunext.patch ./
-              patch -p1 --forward --fuzz=3 < 0001_susfs_157_for_ksunext.patch
-              ;;
-          esac
+            
+          echo "Applying SUSFS patches for KernelSU Next..."
+          cd ./KernelSU-Next
+          cp ../../kernel_patches/next/0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch ./
+          patch -p1 --forward --fuzz=3 < 0001-kernel-implement-susfs-v1.5.8-KernelSU-Next-v1.0.8.patch || true
 
           cd ../common
           patch -p1 --fuzz=3 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
@@ -249,15 +161,9 @@ jobs:
           echo "Changing to configuration directory: $CONFIG..."
           cd "$CONFIG/common"
           
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ]; then
-            echo "Applying hooks for KernelSU-Next..."
-            cp ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
-            patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
-          elif [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "Applying hooks for Wild KSU..."
-            cp ../../kernel_patches/wild/syscall_hooks.patch ./
-            patch -p1 -F 3 < syscall_hooks.patch
-          fi
+          echo "Applying hooks for KernelSU-Next..."
+          cp ../../kernel_patches/next/scope_min_manual_hooks_v1.4.patch ./
+          patch -p1 -F 3 < scope_min_manual_hooks_v1.4.patch
 
       - name: Apply Hide Stuff Patches
         run: |
@@ -269,27 +175,10 @@ jobs:
       - name: Add All Managers
         run: |
           cd "$CONFIG"
-          case "${{ inputs.kernelsu_variant }}" in
-            "WILD")
-              echo "Applying Manager patch for Wild KSU..."
-              cd Wild_KSU
-              cp ../../kernel_patches/wild/manager.patch ./
-              ;;
-            "KSU")
-              echo "Applying Manager patch for Official KernelSU..."
-              cd KernelSU
-              cp ../../kernel_patches/wild/manager.patch ./
-              ;;
-            "NEXT")
-              echo "Applying Manager patch for KernelSU Next..."
-              cd KernelSU-Next
-              cp ../../kernel_patches/next/manager.patch ./
-              ;;
-            "MKSU")
-              echo "Applying Manager patch for MKSU..."
-              #cp ../kernel_patches/mksu/manager.patch .//
-              ;;
-          esac
+
+          echo "Applying Manager patch for KernelSU Next..."
+          cd KernelSU-Next
+          cp ../../kernel_patches/next/manager.patch ./
           patch -p1 --fuzz=3 < manager.patch || echo "No Manager Patch"
 
       - name: Add Configuration Settings
@@ -301,9 +190,8 @@ jobs:
           # Add KSU configuration settings
           echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/gki_defconfig
           
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
-          fi
+          # For KSUN or WILD
+          echo "CONFIG_KSU_KPROBES_HOOK=n" >> ./common/arch/arm64/configs/gki_defconfig
                     
           # Add additional tmpfs config setting
           echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/gki_defconfig
@@ -347,18 +235,15 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
-          else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
-          fi
+          # For KSUN or WILD
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
 
       - name: Change Kernel Name
         run: |
           cd "$CONFIG"
 
           # modify UTS_VERSION
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Jun 30 20:30:00 IST 2025"}' ./common/scripts/mkcompile_h
+          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Jun 30 23:20:00 IST 2025"}' ./common/scripts/mkcompile_h
           
           sed -i '$s|echo "\$res"|echo "-VenGeance+"|' ./common/scripts/setlocalversion
           if [ -f "build/build.sh" ]; then
