@@ -410,7 +410,7 @@ jobs:
           export TZ=Asia/Kolkata
 
           # Create and upload zip
-          ZIP_NAME="VenGeance+ KSUN GKI ${{ inputs.kernel_version }}.${{ inputs.sub_level }}  $(date +'%d-%m-%Y').zip"
+          ZIP_NAME="VenGeance+ KSUN GKI ${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}  $(date +'%d-%m-%Y').zip"
           echo "Creating zip file: $ZIP_NAME..."
           mv ../Image.gz ./Image.gz
           zip -r "../$ZIP_NAME" ./*
