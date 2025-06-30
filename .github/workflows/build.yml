@@ -81,8 +81,8 @@ jobs:
 
       - name: Set boot sign key
         run: |
-        echo "Using AOSP sign key as BOOT_SIGN_KEY ..."
-        echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
+          echo "Using AOSP sign key as BOOT_SIGN_KEY ..."
+          echo "BOOT_SIGN_KEY_PATH=$GITHUB_WORKSPACE/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem" >> $GITHUB_ENV
 
       - name: Install Repo
         run: |
