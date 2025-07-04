@@ -160,6 +160,8 @@ jobs:
           patch -p1 --forward --fuzz=3 < fix_selinux.c.patch
           cp ../../kernel_patches/next/susfs_fix_patches/v1.5.8/fix_ksud.c.patch ./
           patch -p1 --forward --fuzz=3 < fix_ksud.c.patch
+          
+          patch -p1 --forward < ksun_susfs_latest.patch || true
 
       - name: Apply Hooks Patches
         run: |
@@ -248,7 +250,7 @@ jobs:
           cd "$CONFIG"
 
           # modify UTS_VERSION
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Wed July 2 20:50:00 IST 2025"}' ./common/scripts/mkcompile_h
+          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Wed July 4 12:53:00 IST 2025"}' ./common/scripts/mkcompile_h
           
           sed -i '$s|echo "\$res"|echo "-VenGeance+"|' ./common/scripts/setlocalversion
           if [ -f "build/build.sh" ]; then
